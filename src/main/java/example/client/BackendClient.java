@@ -31,17 +31,14 @@ public class BackendClient {
     // ─────────────────────────────────────────────
 
     public String getTrendingMarkets() {
-        Request request = new Request.Builder()
-                .url(baseUrl + "/markets/trending") // Intern 1's endpoint
-                .build();
+        return fetch(baseUrl + "/markets");  // FIXED
 
-        try (Response response = client.newCall(request).execute()) {
-            if (!response.isSuccessful()) return "Error: Backend unreachable.";
-            return response.body().string();
-        } catch (IOException e) {
-            return "Connection failed: " + e.getMessage();
-        }
     }
+
+    public String getMarkets() {
+        return fetch(baseUrl + "/markets");
+    }
+
 
     // ─────────────────────────────────────────────
     // INTERN 2 — Signals Engine
@@ -49,16 +46,7 @@ public class BackendClient {
     // ─────────────────────────────────────────────
 
     public String getSignals() {
-        // Intern 2's endpoint
-        Request request = new Request.Builder()
-                .url(baseUrl + "/signals?top=20")
-                .build();
-
-        try (Response response = client.newCall(request).execute()) {
-            return response.isSuccessful() ? response.body().string() : "⚠️ Signals engine offline.";
-        } catch (IOException e) {
-            return "❌ Connection Error: " + e.getMessage();
-        }
+        return fetch(baseUrl + "/signals?top=20");
     }
 
     // ─────────────────────────────────────────────

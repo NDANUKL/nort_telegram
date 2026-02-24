@@ -4,8 +4,9 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="c031a44b-e24b-419b-b106-5fe675c101a9" name="Changes" comment="Configured intern 3">
+    <list default="true" id="c031a44b-e24b-419b-b106-5fe675c101a9" name="Changes" comment="Updated the base url">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/example/Bot.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/example/Bot.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/example/client/BackendClient.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/example/client/BackendClient.java" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -113,7 +114,8 @@
       <workItem from="1771587461818" duration="6006000" />
       <workItem from="1771669538580" duration="8438000" />
       <workItem from="1771755803056" duration="5881000" />
-      <workItem from="1771921287146" duration="3999000" />
+      <workItem from="1771921287146" duration="7342000" />
+      <workItem from="1771936893457" duration="8698000" />
     </task>
     <task id="LOCAL-00001" summary="Configured intern 3">
       <option name="closed" value="true" />
@@ -131,7 +133,15 @@
       <option name="project" value="LOCAL" />
       <updated>1771922660074</updated>
     </task>
-    <option name="localTasksCounter" value="3" />
+    <task id="LOCAL-00003" summary="Updated the base url">
+      <option name="closed" value="true" />
+      <created>1771927698046</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1771927698046</updated>
+    </task>
+    <option name="localTasksCounter" value="4" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -150,6 +160,7 @@
   </component>
   <component name="VcsManagerConfiguration">
     <MESSAGE value="Configured intern 3" />
-    <option name="LAST_COMMIT_MESSAGE" value="Configured intern 3" />
+    <MESSAGE value="Updated the base url" />
+    <option name="LAST_COMMIT_MESSAGE" value="Updated the base url" />
   </component>
 </project>
