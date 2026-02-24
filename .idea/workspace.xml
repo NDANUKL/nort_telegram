@@ -4,7 +4,10 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="c031a44b-e24b-419b-b106-5fe675c101a9" name="Changes" comment="Configured intern 3" />
+    <list default="true" id="c031a44b-e24b-419b-b106-5fe675c101a9" name="Changes" comment="Configured intern 3">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/example/client/BackendClient.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/example/client/BackendClient.java" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -110,7 +113,7 @@
       <workItem from="1771587461818" duration="6006000" />
       <workItem from="1771669538580" duration="8438000" />
       <workItem from="1771755803056" duration="5881000" />
-      <workItem from="1771921287146" duration="542000" />
+      <workItem from="1771921287146" duration="3999000" />
     </task>
     <task id="LOCAL-00001" summary="Configured intern 3">
       <option name="closed" value="true" />
@@ -120,11 +123,30 @@
       <option name="project" value="LOCAL" />
       <updated>1771921522218</updated>
     </task>
-    <option name="localTasksCounter" value="2" />
+    <task id="LOCAL-00002" summary="Configured intern 3">
+      <option name="closed" value="true" />
+      <created>1771922660074</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1771922660074</updated>
+    </task>
+    <option name="localTasksCounter" value="3" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
     <option name="version" value="3" />
+  </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State />
+          </value>
+        </entry>
+      </map>
+    </option>
   </component>
   <component name="VcsManagerConfiguration">
     <MESSAGE value="Configured intern 3" />

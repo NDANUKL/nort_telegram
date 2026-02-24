@@ -21,7 +21,7 @@ public class BackendClient {
                 .build();
 
         // ── FIXED: point to Windows machine IP, not localhost ──
-        this.baseUrl = "http://localhost:8000";
+        this.baseUrl = "http://100.117.249.117:8000";
     }
 
     // ─────────────────────────────────────────────
