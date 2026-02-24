@@ -33,6 +33,30 @@ public class Bot extends TelegramLongPollingBot {
         if (update.hasMessage() && update.getMessage().hasText()) {
             String messageText = update.getMessage().getText();
             long chatId = update.getMessage().getChatId();
+
+            // Handle transaction proof reply (must be checked before command parsing)
+            if (messageText.matches("[0-9a-fA-F]{64}")) { // crude tx hash check
+                // In production, check user state for pending payment
+                String txHash = messageText;
+                String verifyResult = backend.verifyPayment(txHash, chatId);
+                try {
+                    org.json.JSONObject verifyJson = new org.json.JSONObject(verifyResult);
+                    if (verifyJson.getBoolean("success")) {
+                        sendText(chatId, "✅ Payment verified! Unlocking premium advice...");
+                        // Fetch premium content
+                        // You may want to store the last marketId requested by user
+                        String unlocked = backend.getPremiumAdvice("last_market_id", txHash);
+                        org.json.JSONObject unlockedJson = new org.json.JSONObject(unlocked);
+                        sendText(chatId, "💎 *Premium Content:*\n" + unlockedJson.getString("content"));
+                    } else {
+                        sendText(chatId, "❌ Payment not verified. Details: " + verifyJson.optString("reason", "Unknown error"));
+                    }
+                } catch (Exception e) {
+                    sendText(chatId, "Verification error: " + e.getMessage() + "\nRaw: " + verifyResult);
+                }
+                return;
+            }
+
             String command = messageText.split(" ")[0];
 
             switch (command) {
@@ -84,32 +108,6 @@ public class Bot extends TelegramLongPollingBot {
                     sendText(chatId, "📂 **Portfolio Summary (Paper Mode)**\nBalance: $1,000.00\nActive Bets: 0");
                     break;
 
-                // Removed /premium_advice, now handled by /advice
-                                    // Handle transaction proof reply
-                                    if (messageText.matches("[0-9a-fA-F]{64}")) { // crude tx hash check
-                                        // In production, check user state for pending payment
-                                        String txHash = messageText;
-                                        String verifyResult = backend.verifyPayment(txHash, chatId);
-                                        try {
-                                            org.json.JSONObject verifyJson = new org.json.JSONObject(verifyResult);
-                                            if (verifyJson.getBoolean("success")) {
-                                                sendText(chatId, "✅ Payment verified! Unlocking premium advice...");
-                                                // Fetch premium content
-                                                // You may want to store the last marketId requested by user
-                                                String unlocked = backend.getPremiumAdvice("last_market_id", txHash);
-                                                org.json.JSONObject unlockedJson = new org.json.JSONObject(unlocked);
-                                                sendText(chatId, "💎 *Premium Content:*\n" + unlockedJson.getString("content"));
-                                            } else {
-                                                sendText(chatId, "❌ Payment not verified. Details: " + verifyJson.optString("reason", "Unknown error"));
-                                            }
-                                        } catch (Exception e) {
-                                            sendText(chatId, "Verification error: " + e.getMessage() + "\nRaw: " + verifyResult);
-                                        }
-                                        return;
-                                    }
-                    break;
-
-                // Inside Bot.java -> onUpdateReceived
                 case "/signals":
                     sendText(chatId, "*Analyzing Market Momentum...*");
                     String signals = backend.getSignals(); // Calling real logic!
