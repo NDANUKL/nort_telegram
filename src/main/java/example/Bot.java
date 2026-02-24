@@ -53,22 +53,29 @@ public class Bot extends TelegramLongPollingBot {
                         sendText(chatId, "Usage: /advice <market_id>\nExample: /advice 517310");
                     } else {
                         String mktId = adviceParts[1];
-                        sendText(chatId, "*Analyzing market " + mktId + "...*");
-                        String rawAdvice = backend.getAIAdvice(mktId);
-
+                        // x402 Payment Gate - Start flow
+                        String premiumResponse = backend.getPremiumAdvice(mktId, null);
                         try {
-                            org.json.JSONObject json = new org.json.JSONObject(rawAdvice);
-                            String formatted = "*Market Analysis*\n\n" +
-                                    "*Summary:*\n" + json.getString("summary") + "\n\n" +
-                                    "*Why Trending:*\n" + json.getString("why_trending") + "\n\n" +
-                                    "*Risk Factors:*\n" + json.getJSONArray("risk_factors").join("\n").replace("\"", "• ") + "\n\n" +
-                                    "*Suggested Plan:* " + json.getString("suggested_plan") + "\n" +
-                                    "*Confidence:* " + (int)(json.getDouble("confidence") * 100) + "%\n\n" +
-                                    "_" + json.getString("disclaimer") + "_";
-                            sendText(chatId, formatted);
-                    } catch (Exception e) {
-                    sendText(chatId, "Parse error: " + e.getMessage() + "\n\nRaw: " + rawAdvice.substring(0, Math.min(200, rawAdvice.length())));
-                }
+                            org.json.JSONObject json = new org.json.JSONObject(premiumResponse);
+                            sendText(chatId, "💎 *Premium Content:*\n" + json.getString("content"));
+                        } catch (Exception e) {
+                            // Check for 402 Payment Required
+                            if (premiumResponse.contains("402") || premiumResponse.contains("PAYMENT-REQUIRED")) {
+                                // Parse payment requirements from JSON body
+                                try {
+                                    org.json.JSONObject paymentJson = new org.json.JSONObject(premiumResponse);
+                                    double amount = paymentJson.getDouble("amount");
+                                    String address = paymentJson.getString("address");
+                                    String asset = paymentJson.getString("asset");
+                                    sendText(chatId, "💎 *Premium Content Locked*\nTo unlock, send $" + amount + " " + asset + " to address: `" + address + "` on Base network.\nReply with your transaction hash.");
+                                    // Store state for user (in production, use DB or cache)
+                                } catch (Exception ex) {
+                                    sendText(chatId, "Payment required, but could not parse payment details.\nRaw: " + premiumResponse);
+                                }
+                            } else {
+                                sendText(chatId, "Error: " + e.getMessage() + "\nRaw: " + premiumResponse);
+                            }
+                        }
                     }
                     break;
 
@@ -77,9 +84,29 @@ public class Bot extends TelegramLongPollingBot {
                     sendText(chatId, "📂 **Portfolio Summary (Paper Mode)**\nBalance: $1,000.00\nActive Bets: 0");
                     break;
 
-                case "/premium_advice":
-                    // [INTERN 4]: x402 Payment Gate - Start flow
-                    sendText(chatId, "💎 **Premium Content**\nThis deep analysis requires a $0.05 x402 payment.");
+                // Removed /premium_advice, now handled by /advice
+                                    // Handle transaction proof reply
+                                    if (messageText.matches("[0-9a-fA-F]{64}")) { // crude tx hash check
+                                        // In production, check user state for pending payment
+                                        String txHash = messageText;
+                                        String verifyResult = backend.verifyPayment(txHash, chatId);
+                                        try {
+                                            org.json.JSONObject verifyJson = new org.json.JSONObject(verifyResult);
+                                            if (verifyJson.getBoolean("success")) {
+                                                sendText(chatId, "✅ Payment verified! Unlocking premium advice...");
+                                                // Fetch premium content
+                                                // You may want to store the last marketId requested by user
+                                                String unlocked = backend.getPremiumAdvice("last_market_id", txHash);
+                                                org.json.JSONObject unlockedJson = new org.json.JSONObject(unlocked);
+                                                sendText(chatId, "💎 *Premium Content:*\n" + unlockedJson.getString("content"));
+                                            } else {
+                                                sendText(chatId, "❌ Payment not verified. Details: " + verifyJson.optString("reason", "Unknown error"));
+                                            }
+                                        } catch (Exception e) {
+                                            sendText(chatId, "Verification error: " + e.getMessage() + "\nRaw: " + verifyResult);
+                                        }
+                                        return;
+                                    }
                     break;
 
                 // Inside Bot.java -> onUpdateReceived
