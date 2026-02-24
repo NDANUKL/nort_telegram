@@ -7,8 +7,16 @@ import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import example.client.BackendClient;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
+import org.telegram.telegrambots.meta.api.objects.webapp.WebAppInfo;
+import org.telegram.telegrambots.meta.api.objects.webapp.WebAppData;
 import java.util.ArrayList;
 import java.util.List;
+import okhttp3.MediaType;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
+import java.io.IOException;
 
 public class Bot extends TelegramLongPollingBot {
 
@@ -28,6 +36,15 @@ public class Bot extends TelegramLongPollingBot {
 
     @Override
     public void onUpdateReceived(Update update) {
+
+        // --- HANDLER 0: WEB APP DATA ---
+        if (update.hasMessage() && update.getMessage().getWebAppData() != null) {
+            long chatId = update.getMessage().getChatId();
+            WebAppData wad = update.getMessage().getWebAppData();
+            String data = wad.getData();
+            sendText(chatId, "📨 Received data from Web App: " + data);
+            return;
+        }
 
         // --- HANDLER 1: TEXT COMMANDS ---
         if (update.hasMessage() && update.getMessage().hasText()) {
@@ -171,12 +188,24 @@ public class Bot extends TelegramLongPollingBot {
         List<InlineKeyboardButton> row2 = new ArrayList<>();
         row2.add(InlineKeyboardButton.builder().text("📂 Portfolio").callbackData("btn_portfolio").build());
 
-        // Row 3: The Dashboard (Intern 6)
+        // Row 3: The Dashboard (Intern 6) - provide both App and Browser options
         List<InlineKeyboardButton> row3 = new ArrayList<>();
-        row3.add(InlineKeyboardButton.builder()
-                .text("🖥️ Open Dashboard")
-                .url("https://t.me/Nort67Bot/myapp") // Placeholder for Intern 6's TMA URL
-                .build());
+        String hostUrl = System.getenv("WEBAPP_URL");
+        if (hostUrl == null || hostUrl.isEmpty()) {
+            hostUrl = "https://nort-rho.vercel.app/";
+        }
+
+        // Button A: open in Telegram Web App using hosted URL
+        InlineKeyboardButton appBtn = InlineKeyboardButton.builder()
+                .text("🖥️ Open Dashboard (App)")
+                .webApp(new WebAppInfo(hostUrl))
+                .build();
+
+        // Button B: open hosted URL in browser - reliable on desktop
+        InlineKeyboardButton browserBtn = InlineKeyboardButton.builder()
+                .text("🌐 Open Dashboard (Browser)")
+                .url(hostUrl)
+                .build();
 
         rowsInline.add(row1);
         rowsInline.add(row2);
@@ -189,6 +218,41 @@ public class Bot extends TelegramLongPollingBot {
             execute(sm);
         } catch (TelegramApiException e) {
             e.printStackTrace();
+        }
+    }
+
+    // Return web app URL from env var `WEBAPP_URL`, fall back to BotFather short link
+    private String getWebAppUrl() {
+        String u = System.getenv("WEBAPP_URL");
+        if (u == null || u.isEmpty()) {
+            return "https://t.me/Nort67Bot/nort";
+        }
+        return u;
+    }
+
+    // Call Telegram Bot API to set the Chat Menu Button to a Web App (for top-right menu)
+    // Uses the bot token from env `BOT_TOKEN`.
+    public void setChatMenuWebApp(String webAppUrl) {
+        String token = getBotToken();
+        if (token == null || token.isEmpty()) {
+            System.out.println("setChatMenuWebApp: BOT_TOKEN not set");
+            return;
+        }
+        String api = String.format("https://api.telegram.org/bot%s/setChatMenuButton", token);
+        String payload = String.format("{\"menu_button\":{\"type\":\"web_app\",\"text\":\"🖥️ Open Dashboard\",\"web_app\":{\"url\":\"%s\"}}}", webAppUrl);
+
+        OkHttpClient client = new OkHttpClient();
+        RequestBody body = RequestBody.create(payload, MediaType.get("application/json; charset=utf-8"));
+        Request request = new Request.Builder().url(api).post(body).build();
+
+        try (Response response = client.newCall(request).execute()) {
+            if (response.body() != null) {
+                System.out.println("setChatMenuWebApp response: " + response.body().string());
+            } else {
+                System.out.println("setChatMenuWebApp: empty response");
+            }
+        } catch (IOException e) {
+            System.out.println("setChatMenuWebApp error: " + e.getMessage());
         }
     }
 

@@ -10,6 +10,11 @@ public class Main {
         Bot bot = new Bot();
         botsApi.registerBot(bot);
         bot.sendText(6117624773L, "Hello there and welcome to Nort! Your one stop shop for all your Polymarket advice needs");
+
+        // Ensure the Web App is available from the bot menu (use WEBAPP_URL or fallback)
+        String webApp = System.getenv("WEBAPP_URL");
+        if (webApp == null || webApp.isEmpty()) webApp = "https://nort-rho.vercel.app/";
+        bot.setChatMenuWebApp(webApp);
     }
 }
 
