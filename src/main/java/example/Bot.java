@@ -48,11 +48,28 @@ public class Bot extends TelegramLongPollingBot {
                     break;
 
                 case "/advice":
-                    String mktId = messageText.replace("/advice ", "");
-                    sendText(chatId, "🤖 *OpenClaw AI is analyzing market " + mktId + "...*");
-                    // Intern 3's endpoint
-                    String aiAdvice = backend.getAIAdvice(mktId);
-                    sendText(chatId, "💡 **AI Strategy:**\n" + aiAdvice);
+                    String[] adviceParts = messageText.split(" ");
+                    if (adviceParts.length < 2) {
+                        sendText(chatId, "Usage: /advice <market_id>\nExample: /advice 517310");
+                    } else {
+                        String mktId = adviceParts[1];
+                        sendText(chatId, "*Analyzing market " + mktId + "...*");
+                        String rawAdvice = backend.getAIAdvice(mktId);
+
+                        try {
+                            org.json.JSONObject json = new org.json.JSONObject(rawAdvice);
+                            String formatted = "*Market Analysis*\n\n" +
+                                    "*Summary:*\n" + json.getString("summary") + "\n\n" +
+                                    "*Why Trending:*\n" + json.getString("why_trending") + "\n\n" +
+                                    "*Risk Factors:*\n" + json.getJSONArray("risk_factors").join("\n").replace("\"", "• ") + "\n\n" +
+                                    "*Suggested Plan:* " + json.getString("suggested_plan") + "\n" +
+                                    "*Confidence:* " + (int)(json.getDouble("confidence") * 100) + "%\n\n" +
+                                    "_" + json.getString("disclaimer") + "_";
+                            sendText(chatId, formatted);
+                    } catch (Exception e) {
+                    sendText(chatId, "Parse error: " + e.getMessage() + "\n\nRaw: " + rawAdvice.substring(0, Math.min(200, rawAdvice.length())));
+                }
+                    }
                     break;
 
                 case "/portfolio":
@@ -67,9 +84,9 @@ public class Bot extends TelegramLongPollingBot {
 
                 // Inside Bot.java -> onUpdateReceived
                 case "/signals":
-                    sendText(chatId, "📊 *Analyzing Market Momentum...*");
+                    sendText(chatId, "*Analyzing Market Momentum...*");
                     String signals = backend.getSignals(); // Calling real logic!
-                    sendText(chatId, "✅ **Top Opportunities:**\n" + signals);
+                    sendText(chatId, "**Top Opportunities:**\n" + signals);
                     break;
 
                 case "/papertrade":
@@ -96,11 +113,11 @@ public class Bot extends TelegramLongPollingBot {
             if (callData.equals("btn_trending")) {
                 // Triggering Intern 1's Market Logic
                 String response = backend.getTrendingMarkets();
-                sendText(chatId, "🔥 **Current Trends:**\n" + response);
+                sendText(chatId, "**Current Trends:**\n" + response);
             }
             else if (callData.equals("btn_advice")) {
                 // Triggering Intern 3's Agent Logic
-                sendText(chatId, "💡 Enter the Market ID for AI analysis:");
+                sendText(chatId, "Enter the Market ID for AI analysis:");
             }
             else if (callData.equals("btn_portfolio")) {
                 // Triggering Intern 5's Paper Wallet
@@ -113,7 +130,7 @@ public class Bot extends TelegramLongPollingBot {
     public void sendMenu(Long chatId) {
         SendMessage sm = SendMessage.builder()
                 .chatId(chatId.toString())
-                .text("🚀 **Nort67 AI Assistant**\nWelcome to the prediction market hub. Select a service:")
+                .text("**Nort67 AI Assistant**\nWelcome to the prediction market hub. Select a service:")
                 .parseMode("Markdown")
                 .build();
 

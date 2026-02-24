@@ -14,16 +14,21 @@ public class BackendClient {
     public static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
 
     public BackendClient() {
-        // Updated with longer timeouts because AI agents (OpenClaw) take time to process
         this.client = new OkHttpClient.Builder()
                 .connectTimeout(10, TimeUnit.SECONDS)
                 .writeTimeout(10, TimeUnit.SECONDS)
-                .readTimeout(60, TimeUnit.SECONDS) // OpenClaw gets 60 seconds to respond
+                .readTimeout(180, TimeUnit.SECONDS)
                 .build();
 
-        // Point this to where your team's FastAPI is running
+        // ── FIXED: point to Windows machine IP, not localhost ──
         this.baseUrl = "http://localhost:8000";
     }
+
+    // ─────────────────────────────────────────────
+    // INTERN 1 — Market Data
+    // GET /markets/        → all active markets
+    // GET /markets/{id}    → single market detail
+    // ─────────────────────────────────────────────
 
     public String getTrendingMarkets() {
         Request request = new Request.Builder()
@@ -38,6 +43,11 @@ public class BackendClient {
         }
     }
 
+    // ─────────────────────────────────────────────
+    // INTERN 2 — Signals Engine
+    // GET /signals/?top=20 → ranked market opportunities
+    // ─────────────────────────────────────────────
+
     public String getSignals() {
         // Intern 2's endpoint
         Request request = new Request.Builder()
@@ -51,15 +61,19 @@ public class BackendClient {
         }
     }
 
-    /**
-     * Fixed the error: This method was missing!
-     * Calls Intern 3's OpenClaw AI Advice endpoint.
-     */
-    public String getAIAdvice(String marketId) {
-        Request request = new Request.Builder()
-                .url(baseUrl + "/agent/advice?market_id=" + marketId)
-                .build();
+    // ─────────────────────────────────────────────
+    // INTERN 3 — OpenClaw AI Agent
+    // POST /agent/advice → free AI advice
+    // POST /agent/advice with premium:true → premium advice
+    // ─────────────────────────────────────────────
 
+    public String getAIAdvice(String marketId) {
+        String json = String.format("{\"market_id\":\"%s\",\"telegram_id\":null,\"premium\":false}", marketId);
+        RequestBody body = RequestBody.create(json, JSON);
+        Request request = new Request.Builder()
+                .url(baseUrl + "/agent/advice")
+                .post(body)
+                .build();
         try (Response response = client.newCall(request).execute()) {
             if (!response.isSuccessful()) return "⚠️ AI Agent busy or market ID invalid.";
             return response.body().string();
@@ -68,22 +82,85 @@ public class BackendClient {
         }
     }
 
-    public String placePaperTrade(long chatId, String marketId, String side, double amount) {
-        // Intern 5's endpoint
-        // Using string formatting to build the JSON body
-        String json = String.format("{\"user_id\":\"%d\", \"market_id\":\"%s\", \"side\":\"%s\", \"amount\":%f}",
-                chatId, marketId, side, amount);
+    public String getPremiumAdvice(String marketId, String paymentProof) {
+        String json = String.format(
+                "{\"market_id\":\"%s\", \"premium\":true}",
+                marketId
+        );
+        return post(baseUrl + "/agent/advice", json);
+    }
 
-        RequestBody body = RequestBody.create(json, JSON);
+    // ─────────────────────────────────────────────
+    // INTERN 5 — Paper Trading + Wallet
+    // POST /papertrade              → place a paper trade
+    // GET  /wallet/summary          → get wallet balance and trades
+    // POST /trade/commit            → attach testnet receipt
+    // ─────────────────────────────────────────────
+
+    public String placePaperTrade(long chatId, String marketId, String side, double amount) {
+        double pricePerShare = 0.5;
+        double shares = amount / pricePerShare;
+        String outcome = side.toUpperCase();
+        String json = String.format(
+                "{\"telegram_user_id\":\"%d\", \"market_id\":\"%s\", \"market_question\":\"Market %s\", \"outcome\":\"%s\", \"shares\":%.2f, \"price_per_share\":%.2f, \"direction\":\"BUY\"}",
+                chatId, marketId, marketId, outcome, shares, pricePerShare
+        );
+        return post(baseUrl + "/papertrade", json);
+    }
+
+    public String getWalletSummary(long chatId) {
+        return fetch(baseUrl + "/wallet/summary?telegram_user_id=" + chatId);
+    }
+
+    public String commitTrade(int tradeId) {
+        String json = String.format("{\"trade_id\":%d}", tradeId);
+        return post(baseUrl + "/trade/commit", json);
+    }
+
+    // ─────────────────────────────────────────────
+    // INTERN 4 — x402 Payment Verification
+    // POST /x402/verify → verify payment proof
+    // ─────────────────────────────────────────────
+
+    public String verifyPayment(String proof, long chatId) {
+        String json = String.format(
+                "{\"proof\":\"%s\", \"user_id\":\"%d\"}",
+                proof, chatId
+        );
+        return post(baseUrl + "/x402/verify", json);
+    }
+
+    // ─────────────────────────────────────────────
+    // PRIVATE HELPERS
+    // ─────────────────────────────────────────────
+
+    private String fetch(String url) {
         Request request = new Request.Builder()
-                .url(baseUrl + "/papertrade")
+                .url(url)
+                .build();
+        try (Response response = client.newCall(request).execute()) {
+            if (!response.isSuccessful()) {
+                return "Error " + response.code() + ": " + response.message();
+            }
+            return response.body().string();
+        } catch (IOException e) {
+            return "Connection failed: " + e.getMessage();
+        }
+    }
+
+    private String post(String url, String jsonBody) {
+        RequestBody body = RequestBody.create(jsonBody, JSON);
+        Request request = new Request.Builder()
+                .url(url)
                 .post(body)
                 .build();
-
         try (Response response = client.newCall(request).execute()) {
-            return response.isSuccessful() ? response.body().string() : "⚠️ Trade rejected by backend.";
+            if (!response.isSuccessful()) {
+                return "Error " + response.code() + ": " + response.message();
+            }
+            return response.body().string();
         } catch (IOException e) {
-            return "❌ Trade failed: Connection error.";
+            return "Connection failed: " + e.getMessage();
         }
     }
 }
