@@ -15,8 +15,8 @@ public class BackendClient {
 
     public BackendClient() {
         this.client = new OkHttpClient.Builder()
-                .connectTimeout(10, TimeUnit.SECONDS)
-                .writeTimeout(10, TimeUnit.SECONDS)
+                .connectTimeout(30, TimeUnit.SECONDS)
+                .writeTimeout(60, TimeUnit.SECONDS)
                 .readTimeout(180, TimeUnit.SECONDS)
                 .build();
 
@@ -31,14 +31,13 @@ public class BackendClient {
     // ─────────────────────────────────────────────
 
     public String getTrendingMarkets() {
-        return fetch(baseUrl + "/markets");  // FIXED
-
+        return fetch(baseUrl + "/markets?limit=20&sort_by=volume");
     }
+
 
     public String getMarkets() {
-        return fetch(baseUrl + "/markets");
+        return fetch(baseUrl + "/markets?limit=50");  // Full list
     }
-
 
     // ─────────────────────────────────────────────
     // INTERN 2 — Signals Engine

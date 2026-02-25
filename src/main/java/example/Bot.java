@@ -9,6 +9,8 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMa
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 import java.util.ArrayList;
 import java.util.List;
+import org.json.JSONObject;
+import org.json.JSONArray;
 
 public class Bot extends TelegramLongPollingBot {
 
@@ -66,11 +68,11 @@ public class Bot extends TelegramLongPollingBot {
                     break;
 
                 case "/trending":
-                    // [INTERN 1 & 2]: Fetching markets and signals from Python
-                    sendText(chatId, "*Querying Signals Engine...*");
-                    String marketData = backend.getTrendingMarkets();
-                    sendText(chatId, "**Top Opportunities:**\n" + marketData);
+                    String trending = backend.getTrendingMarkets();
+                    sendFormattedMarkets(chatId, trending, "TOP 20 TRENDING"); // ✅ Fixed
                     break;
+
+
 
                 case "/advice":
                     String[] adviceParts = messageText.split(" ");
@@ -139,9 +141,8 @@ public class Bot extends TelegramLongPollingBot {
                     break;
 
                 case "/markets":
-                    sendText(chatId, "*Fetching Markets...*");
-                    String rawMarkets = backend.getMarkets();
-                    sendText(chatId, "**Top Markets:**\n" + rawMarkets);
+                    String allMarkets = backend.getMarkets();
+                    sendFormattedMarkets(chatId, allMarkets, "TOP 50 MARKETS"); // ✅ Fixed
                     break;
 
 
@@ -173,13 +174,12 @@ public class Bot extends TelegramLongPollingBot {
             long chatId = update.getCallbackQuery().getMessage().getChatId();
 
             if (callData.equals("btn_trending")) {
-                // Triggering Intern 1's Market Logic
-                String response = backend.getTrendingMarkets();
-                sendText(chatId, "**Current Trends:**\n" + response);
-            }
+                String trending = backend.getTrendingMarkets();  // Correct endpoint
+                sendFormattedMarkets(chatId, trending, "🔥 TOP 20 TRENDING");  // ✅ Formatted!
+        }
             else if (callData.equals("btn_advice")) {
                 // Triggering Intern 3's Agent Logic
-                sendText(chatId, "Enter the Market ID for AI analysis:");
+                sendText(chatId, "Enter the following command /advice <market_id> for AI analysis:");
             }
             else if (callData.equals("btn_portfolio")) {
                 // Triggering Intern 5's Paper Wallet
@@ -188,12 +188,29 @@ public class Bot extends TelegramLongPollingBot {
         }
     }
 
+    private void sendFormattedMarkets(Long chatId, String rawJson, String title) {
+        try {
+            JSONObject json = new JSONObject(rawJson);
+            JSONArray markets = json.getJSONArray("markets");
+
+            StringBuilder msg = new StringBuilder(title + ":\n\n");
+            for (int i = 0; i < Math.min(10, markets.length()); i++) {
+                JSONObject m = markets.getJSONObject(i);
+                String summary = m.getString("summary");
+                msg.append("• ").append(summary).append("\n\n");
+            }
+            sendText(chatId, msg.toString());
+        } catch (Exception e) {
+            sendText(chatId, title + ":\n" + rawJson.substring(0, 2000));
+        }
+    }
+
     // --- UI COMPONENT: MAIN MENU ---
     public void sendMenu(Long chatId) {
         SendMessage sm = SendMessage.builder()
                 .chatId(chatId.toString())
-                .text("**Nort67 AI Assistant**\nWelcome to the prediction market hub. Select a service:")
-                .parseMode("Markdown")
+                .text("Nort67 AI Assistant\nWelcome to the prediction market hub. Select a service:") // ❌ No Markdown
+                .disableWebPagePreview(true) // ✅ Plain text
                 .build();
 
         InlineKeyboardMarkup markupInline = new InlineKeyboardMarkup();
@@ -231,15 +248,23 @@ public class Bot extends TelegramLongPollingBot {
 
     // --- HELPER: BASIC TEXT SENDER ---
     public void sendText(Long chatId, String text) {
+        // Truncate to safe 3000 chars
+        if (text.length() > 3000) {
+            text = text.substring(0, 3000) + "\n\n📄 (Truncated - too long)";
+        }
+
         SendMessage sm = SendMessage.builder()
                 .chatId(chatId.toString())
                 .text(text)
-                .parseMode("Markdown")
+                // ❌ NO PARSEMODE - plain text only
+                .disableWebPagePreview(true)
                 .build();
+
         try {
             execute(sm);
         } catch (TelegramApiException e) {
-            e.printStackTrace();
+            System.err.println("Send failed: " + e.getMessage());
         }
     }
+
 }
