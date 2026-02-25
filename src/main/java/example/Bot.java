@@ -30,7 +30,6 @@ public class Bot extends TelegramLongPollingBot {
 
     @Override
     public String getBotToken() {
-        // Intern 4: Set this in IntelliJ Run Configuration Environment Variables!
         return System.getenv("BOT_TOKEN");
     }
 
@@ -52,17 +51,14 @@ public class Bot extends TelegramLongPollingBot {
             long chatId = update.getMessage().getChatId();
 
             // Handle transaction proof reply (must be checked before command parsing)
-            if (messageText.matches("[0-9a-fA-F]{64}")) { // crude tx hash check
-                // In production, check user state for pending payment
+            if (messageText.matches("[0-9a-fA-F]{64}")) {
                 String txHash = messageText;
                 String verifyResult = backend.verifyPayment(txHash, chatId);
                 try {
                     org.json.JSONObject verifyJson = new org.json.JSONObject(verifyResult);
                     if (verifyJson.getBoolean("success")) {
                         sendText(chatId, "✅ Payment verified! Unlocking premium advice...");
-                        // Fetch premium content
-                        // You may want to store the last marketId requested by user
-                        String unlocked = backend.getPremiumAdvice("last_market_id", txHash);
+                        String unlocked = backend.getPremiumAdvice("last_market_id", chatId);
                         org.json.JSONObject unlockedJson = new org.json.JSONObject(unlocked);
                         sendText(chatId, "💎 *Premium Content:*\n" + unlockedJson.getString("content"));
                     } else {
@@ -76,14 +72,12 @@ public class Bot extends TelegramLongPollingBot {
 
             String command = messageText.split(" ")[0];
 
-
             switch (command) {
                 case "/start":
                     sendMenu(chatId);
                     break;
 
                 case "/trending":
-                    // [INTERN 1 & 2]: Fetching markets and signals from Python
                     sendText(chatId, "*Querying Signals Engine...*");
                     String marketData = backend.getTrendingMarkets();
                     sendText(chatId, "**Top Opportunities:**\n" + marketData);
@@ -95,63 +89,34 @@ public class Bot extends TelegramLongPollingBot {
                         sendText(chatId, "Usage: /advice <market_id>\nExample: /advice 527079");
                     } else {
                         String mktId = adviceParts[1];
-                        sendText(chatId, "Analyzing market " + mktId + "...");
-                        String rawAdvice = backend.getAIAdvice(mktId);
-
+                        System.out.println("DEBUG /advice: requesting premium advice for market " + mktId);
+                        String premiumResponse = backend.getPremiumAdvice(mktId, chatId);
+                        System.out.println("DEBUG /advice: backend response = " + premiumResponse);
                         try {
-                            org.json.JSONObject json = new org.json.JSONObject(rawAdvice);
-
-                            // Flexible key mapping for all JSON fields
-                            String marketId = json.optString("market_id", json.optString("marketid", mktId));
-                            String summary = json.optString("summary", "");
-                            String whyTrending = json.optString("why_trending", json.optString("whytrending", ""));
-                            String plan = json.optString("suggested_plan", json.optString("suggestedplan", "WAIT"));
-                            String disclaimer = json.optString("disclaimer", "");
-                            double confidence = json.optDouble("confidence", 0.5);
-                            String staleWarning = json.optString("stale_data_warning", json.optString("staledatawarning", ""));
-
-                            // Parse all possible risk factors arrays
-                            String riskList = "None listed";
-                            try {
-                                String riskKey = json.optString("risk_factors", json.optString("riskfactors", "[]"));
-                                org.json.JSONArray risks = new org.json.JSONArray(riskKey);
-                                if (risks.length() > 0) {
-                                    StringBuilder sb = new StringBuilder();
-                                    for (int i = 0; i < risks.length(); i++) {
-                                        sb.append("- ").append(risks.getString(i)).append("\n");
-                                    }
-                                    riskList = sb.toString();
-                                }
-                            } catch (Exception ignored) {
-                                riskList = json.optString("risk_factors", "Parse error");
-                            }
-
-                            // Full detailed output matching JSON structure
-                            StringBuilder formatted = new StringBuilder();
-                            formatted.append("Market Analysis: ").append(marketId).append("\n\n");
-                            formatted.append("Summary:\n").append(summary).append("\n\n");
-                            formatted.append("Why Trending:\n").append(whyTrending).append("\n\n");
-                            formatted.append("Risk Factors:\n").append(riskList).append("\n\n");
-                            formatted.append("Suggested Plan: ").append(plan).append("\n");
-                            formatted.append("Confidence: ").append(String.format("%.0f", confidence * 100)).append("%\n\n");
-
-                            if (!staleWarning.isEmpty()) {
-                                formatted.append("Data Warning:\n").append(staleWarning).append("\n\n");
-                            }
-
-                            formatted.append(disclaimer);
-
-                            sendText(chatId, formatted.toString());
+                            org.json.JSONObject json = new org.json.JSONObject(premiumResponse);
+                            sendText(chatId, "💎 *Premium Content:*\n" + json.getString("content"));
                         } catch (Exception e) {
-                            sendText(chatId, "Parse error: " + e.getMessage() + "\n\nRaw JSON:\n" +
-                                    rawAdvice.substring(0, Math.min(2000, rawAdvice.length())));
+                            System.out.println("DEBUG /advice: JSON parse failed, checking for 402...");
+                            if (premiumResponse.contains("402") || premiumResponse.contains("PAYMENT-REQUIRED")) {
+                                try {
+                                    org.json.JSONObject paymentJson = new org.json.JSONObject(premiumResponse);
+                                    double amount = paymentJson.getDouble("amount");
+                                    String address = paymentJson.getString("address");
+                                    String asset = paymentJson.getString("asset");
+                                    sendText(chatId, "💎 *Premium Content Locked*\nTo unlock, send $" + amount + " " + asset + " to address: `" + address + "` on Base network.\nReply with your transaction hash.");
+                                } catch (Exception ex) {
+                                    System.out.println("DEBUG /advice: Failed to parse payment JSON: " + ex.getMessage());
+                                    sendText(chatId, "Payment required, but could not parse payment details.\nRaw: " + premiumResponse);
+                                }
+                            } else {
+                                System.out.println("DEBUG /advice: No 402 found, treating as error");
+                                sendText(chatId, "Error: " + e.getMessage() + "\nRaw: " + premiumResponse.substring(0, Math.min(200, premiumResponse.length())));
+                            }
                         }
                     }
                     break;
 
-
                 case "/portfolio":
-                    // [INTERN 5]: Fetching Paper Trade history from SQLite
                     sendText(chatId, "📂 **Portfolio Summary (Paper Mode)**\nBalance: $1,000.00\nActive Bets: 0");
                     break;
 
@@ -161,15 +126,13 @@ public class Bot extends TelegramLongPollingBot {
                     sendText(chatId, "**Top Markets:**\n" + rawMarkets);
                     break;
 
-
                 case "/signals":
                     sendText(chatId, "*Analyzing Market Momentum...*");
-                    String signals = backend.getSignals(); // Calling real logic!
+                    String signals = backend.getSignals();
                     sendText(chatId, "**Top Opportunities:**\n" + signals);
                     break;
 
                 case "/papertrade":
-                    // Example: /papertrade 123 yes 50
                     String[] parts = messageText.split(" ");
                     if (parts.length < 4) {
                         sendText(chatId, "📝 Use: `/papertrade <id> <yes/no> <amount>`");
@@ -190,16 +153,13 @@ public class Bot extends TelegramLongPollingBot {
             long chatId = update.getCallbackQuery().getMessage().getChatId();
 
             if (callData.equals("btn_trending")) {
-                // Triggering Intern 1's Market Logic
                 String response = backend.getTrendingMarkets();
                 sendText(chatId, "**Current Trends:**\n" + response);
             }
             else if (callData.equals("btn_advice")) {
-                // Triggering Intern 3's Agent Logic
                 sendText(chatId, "Enter the Market ID for AI analysis:");
             }
             else if (callData.equals("btn_portfolio")) {
-                // Triggering Intern 5's Paper Wallet
                 sendText(chatId, "📂 Loading your paper trades...");
             }
         }
@@ -225,28 +185,8 @@ public class Bot extends TelegramLongPollingBot {
         List<InlineKeyboardButton> row2 = new ArrayList<>();
         row2.add(InlineKeyboardButton.builder().text("📂 Portfolio").callbackData("btn_portfolio").build());
 
-        // Row 3: The Dashboard (Intern 6) - provide both App and Browser options
-        List<InlineKeyboardButton> row3 = new ArrayList<>();
-        String hostUrl = System.getenv("WEBAPP_URL");
-        if (hostUrl == null || hostUrl.isEmpty()) {
-            hostUrl = "https://nort-rho.vercel.app/";
-        }
-
-        // Button A: open in Telegram Web App using hosted URL
-        InlineKeyboardButton appBtn = InlineKeyboardButton.builder()
-                .text("🖥️ Open Dashboard (App)")
-                .webApp(new WebAppInfo(hostUrl))
-                .build();
-
-        // Button B: open hosted URL in browser - reliable on desktop
-        InlineKeyboardButton browserBtn = InlineKeyboardButton.builder()
-                .text("🌐 Open Dashboard (Browser)")
-                .url(hostUrl)
-                .build();
-
         rowsInline.add(row1);
-        rowsInline.add(row2);
-        rowsInline.add(row3);
+        rowsInline.add(row2);  // FIXED: was row2Bot
 
         markupInline.setKeyboard(rowsInline);
         sm.setReplyMarkup(markupInline);
@@ -268,7 +208,6 @@ public class Bot extends TelegramLongPollingBot {
     }
 
     // Call Telegram Bot API to set the Chat Menu Button to a Web App (for top-right menu)
-    // Uses the bot token from env `BOT_TOKEN`.
     public void setChatMenuWebApp(String webAppUrl) {
         String token = getBotToken();
         if (token == null || token.isEmpty()) {

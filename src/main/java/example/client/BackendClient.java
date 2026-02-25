@@ -20,8 +20,8 @@ public class BackendClient {
                 .readTimeout(180, TimeUnit.SECONDS)
                 .build();
 
-        // ── FIXED: point to Windows machine IP, not localhost ──
-        this.baseUrl = "http://100.117.249.117:8000";
+        // Point to Render backend
+        this.baseUrl = "https://nort.onrender.com";
     }
 
     // ─────────────────────────────────────────────
@@ -70,12 +70,12 @@ public class BackendClient {
         }
     }
 
-    public String getPremiumAdvice(String marketId, String paymentProof) {
-        String json = String.format(
-                "{\"market_id\":\"%s\", \"premium\":true}",
-                marketId
-        );
-        return post(baseUrl + "/agent/advice", json);
+    public String getPremiumAdvice(String marketId, long chatId) {
+    String json = String.format(
+        "{\"market_id\":\"%s\", \"telegram_id\":\"%d\", \"premium\":true}",
+        marketId, chatId
+    );
+    return post(baseUrl + "/agent/advice", json);
     }
 
     // ─────────────────────────────────────────────
