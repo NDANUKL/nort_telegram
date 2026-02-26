@@ -29,7 +29,6 @@ public class Bot extends TelegramLongPollingBot {
             throw new RuntimeException("BOT_TOKEN environment variable not set!");
         }
         return token;
-        return System.getenv("BOT_TOKEN");
     }
 
     @Override
@@ -37,26 +36,6 @@ public class Bot extends TelegramLongPollingBot {
         if (update.hasMessage() && update.getMessage().hasText()) {
             String messageText = update.getMessage().getText();
             long chatId = update.getMessage().getChatId();
-
-            // Handle transaction proof reply (must be checked before command parsing)
-            if (messageText.matches("[0-9a-fA-F]{64}")) {
-                String txHash = messageText;
-                String verifyResult = backend.verifyPayment(txHash, chatId);
-                try {
-                    org.json.JSONObject verifyJson = new org.json.JSONObject(verifyResult);
-                    if (verifyJson.getBoolean("success")) {
-                        sendText(chatId, "✅ Payment verified! Unlocking premium advice...");
-                        String unlocked = backend.getPremiumAdvice("last_market_id", chatId);
-                        org.json.JSONObject unlockedJson = new org.json.JSONObject(unlocked);
-                        sendText(chatId, "💎 *Premium Content:*\n" + unlockedJson.getString("content"));
-                    } else {
-                        sendText(chatId, "❌ Payment not verified. Details: " + verifyJson.optString("reason", "Unknown error"));
-                    }
-                } catch (Exception e) {
-                    sendText(chatId, "Verification error: " + e.getMessage() + "\nRaw: " + verifyResult);
-                }
-                return;
-            }
 
             String command = messageText.split(" ")[0];
 
@@ -67,7 +46,6 @@ public class Bot extends TelegramLongPollingBot {
 
                 case "/trending":
                     sendText(chatId, "Querying trending markets...");
-                    sendText(chatId, "*Querying Signals Engine...*");
                     String marketData = backend.getTrendingMarkets();
                     if (marketData == null || marketData.trim().isEmpty()) {
                         marketData = "No trending markets available at this time.";
@@ -82,35 +60,70 @@ public class Bot extends TelegramLongPollingBot {
                         sendText(chatId, "Usage: /advice <market_id>\nExample: /advice 527079");
                     } else {
                         String mktId = adviceParts[1];
-                        System.out.println("DEBUG /advice: requesting premium advice for market " + mktId);
-                        String premiumResponse = backend.getPremiumAdvice(mktId, chatId);
-                        System.out.println("DEBUG /advice: backend response = " + premiumResponse);
+                        sendText(chatId, "Analyzing market " + mktId + "...");
+                        String rawAdvice = backend.getAIAdvice(mktId);
+
                         try {
-                            org.json.JSONObject json = new org.json.JSONObject(premiumResponse);
-                            sendText(chatId, "💎 *Premium Content:*\n" + json.getString("content"));
-                        } catch (Exception e) {
-                            System.out.println("DEBUG /advice: JSON parse failed, checking for 402...");
-                            if (premiumResponse.contains("402") || premiumResponse.contains("PAYMENT-REQUIRED")) {
-                                try {
-                                    org.json.JSONObject paymentJson = new org.json.JSONObject(premiumResponse);
-                                    double amount = paymentJson.getDouble("amount");
-                                    String address = paymentJson.getString("address");
-                                    String asset = paymentJson.getString("asset");
-                                    sendText(chatId, "💎 *Premium Content Locked*\nTo unlock, send $" + amount + " " + asset + " to address: `" + address + "` on Base network.\nReply with your transaction hash.");
-                                } catch (Exception ex) {
-                                    System.out.println("DEBUG /advice: Failed to parse payment JSON: " + ex.getMessage());
-                                    sendText(chatId, "Payment required, but could not parse payment details.\nRaw: " + premiumResponse);
+                            JSONObject json = new JSONObject(rawAdvice);
+                            String marketId = json.optString("market_id", mktId);
+                            String summary = json.optString("summary", "");
+                            String whyTrending = json.optString("why_trending", "");
+                            String plan = json.optString("suggested_plan", "WAIT");
+                            String disclaimer = json.optString("disclaimer", "This is not financial advice.");
+                            double confidence = json.optDouble("confidence", 0.5);
+                            String staleWarning = json.optString("stale_data_warning", "");
+
+                            // Parse risk factors
+                            String riskList = "None listed";
+                            try {
+                                Object risksObj = json.opt("risk_factors");
+                                if (risksObj instanceof JSONArray) {
+                                    JSONArray risks = (JSONArray) risksObj;
+                                    StringBuilder sb = new StringBuilder();
+                                    for (int i = 0; i < risks.length(); i++) {
+                                        sb.append("• ").append(risks.getString(i)).append("\n");
+                                    }
+                                    riskList = sb.toString();
                                 }
-                            } else {
-                                System.out.println("DEBUG /advice: No 402 found, treating as error");
-                                sendText(chatId, "Error: " + e.getMessage() + "\nRaw: " + premiumResponse.substring(0, Math.min(200, premiumResponse.length())));
+                            } catch (Exception ignored) {}
+
+                            StringBuilder formatted = new StringBuilder();
+                            formatted.append("MARKET ANALYSIS: ").append(marketId).append("\n");
+                            formatted.append("SUMMARY\n");
+                            formatted.append(summary).append("\n\n");
+                            formatted.append("TREND ANALYSIS\n");
+                            formatted.append(whyTrending).append("\n\n");
+                            formatted.append("RISK FACTORS\n");
+                            formatted.append(riskList).append("\n\n");
+                            formatted.append("RECOMMENDED ACTION: ").append(plan).append("\n");
+                            formatted.append("CONFIDENCE LEVEL: ").append(String.format("%.0f%%", confidence * 100)).append("\n\n");
+
+                            if (!staleWarning.isEmpty()) {
+                                formatted.append("DATA WARNING\n");
+                                formatted.append(staleWarning).append("\n\n");
                             }
+
+                            formatted.append("═══════════════════════════════════════\n");
+                            formatted.append(disclaimer).append("\n");
+                            formatted.append("Analysis powered by real-time market data, web search, and AI reasoning.");
+
+                            sendText(chatId, formatted.toString());
+                        } catch (Exception e) {
+                            sendText(chatId, "Parse error: " + e.getMessage() +
+                                    "\n\nRaw response preview:\n" +
+                                    rawAdvice.substring(0, Math.min(1000, rawAdvice.length())));
                         }
                     }
                     break;
 
                 case "/portfolio":
-                    sendText(chatId, "📂 **Portfolio Summary (Paper Mode)**\nBalance: $1,000.00\nActive Bets: 0");
+                    sendText(chatId, "PORTFOLIO SUMMARY (Paper Trading Mode)\n" +
+                            "═══════════════════════════════════════\n" +
+                            "Account Balance: $1,000.00\n" +
+                            "Active Positions: 0\n" +
+                            "Total PNL: $0.00\n" +
+                            "Win Rate: N/A\n\n" +
+                            "Paper trading environment - no real funds at risk.");
                     break;
 
                 case "/markets":
@@ -124,9 +137,13 @@ public class Bot extends TelegramLongPollingBot {
                     break;
 
                 case "/signals":
-                    sendText(chatId, "*Analyzing Market Momentum...*");
+                    sendText(chatId, "Analyzing market momentum...");
                     String signals = backend.getSignals();
-                    sendText(chatId, "**Top Opportunities:**\n" + signals);
+                    if (signals == null || signals.trim().isEmpty()) {
+                        signals = "No signals available.";
+                    }
+                    sendText(chatId, "MARKET SIGNALS RANKING\n" +
+                            "═══════════════════════\n\n" + signals);
                     break;
 
                 case "/papertrade":
@@ -166,15 +183,27 @@ public class Bot extends TelegramLongPollingBot {
             String callData = update.getCallbackQuery().getData();
             long chatId = update.getCallbackQuery().getMessage().getChatId();
 
-            if (callData.equals("btn_trending")) {
-                String response = backend.getTrendingMarkets();
-                sendText(chatId, "**Current Trends:**\n" + response);
-            }
-            else if (callData.equals("btn_advice")) {
-                sendText(chatId, "Enter the Market ID for AI analysis:");
-            }
-            else if (callData.equals("btn_portfolio")) {
-                sendText(chatId, "📂 Loading your paper trades...");
+            switch (callData) {
+                case "btn_trending":
+                    String response = backend.getTrendingMarkets();
+                    sendText(chatId, response != null && !response.trim().isEmpty() ?
+                            "TRENDING MARKETS\n═══════════════════════\n\n" + response :
+                            "No trending market data available at this time.");
+                    break;
+                case "btn_advice":
+                    sendText(chatId, "AI ADVICE\n" +
+                            "═════════════\n" +
+                            "Usage: /advice <market_id>\n" +
+                            "Example: /advice 527079\n\n" +
+                            "Get detailed AI-powered analysis for any market.");
+                    break;
+                case "btn_portfolio":
+                    sendText(chatId, "PORTFOLIO SUMMARY (Paper Trading Mode)\n" +
+                            "═══════════════════════════════════════\n" +
+                            "Account Balance: $1,000.00\n" +
+                            "Active Positions: 0\n" +
+                            "Total PNL: $0.00");
+                    break;
             }
         }
     }
@@ -199,10 +228,10 @@ public class Bot extends TelegramLongPollingBot {
         row1.add(InlineKeyboardButton.builder().text("AI Advice").callbackData("btn_advice").build());
 
         List<InlineKeyboardButton> row2 = new ArrayList<>();
-        row2.add(InlineKeyboardButton.builder().text("📂 Portfolio").callbackData("btn_portfolio").build());
+        row2.add(InlineKeyboardButton.builder().text("Portfolio").callbackData("btn_portfolio").build());
 
         rowsInline.add(row1);
-        rowsInline.add(row2);  // FIXED: was row2Bot
+        rowsInline.add(row2);
 
         markupInline.setKeyboard(rowsInline);
         sm.setReplyMarkup(markupInline);
@@ -210,41 +239,7 @@ public class Bot extends TelegramLongPollingBot {
         try {
             execute(sm);
         } catch (TelegramApiException e) {
-            e.printStackTrace();
-        }
-    }
-
-    // Return web app URL from env var `WEBAPP_URL`, fall back to BotFather short link
-    private String getWebAppUrl() {
-        String u = System.getenv("WEBAPP_URL");
-        if (u == null || u.isEmpty()) {
-            return "https://t.me/Nort67Bot/nort";
-        }
-        return u;
-    }
-
-    // Call Telegram Bot API to set the Chat Menu Button to a Web App (for top-right menu)
-    public void setChatMenuWebApp(String webAppUrl) {
-        String token = getBotToken();
-        if (token == null || token.isEmpty()) {
-            System.out.println("setChatMenuWebApp: BOT_TOKEN not set");
-            return;
-        }
-        String api = String.format("https://api.telegram.org/bot%s/setChatMenuButton", token);
-        String payload = String.format("{\"menu_button\":{\"type\":\"web_app\",\"text\":\"🖥️ Open Dashboard\",\"web_app\":{\"url\":\"%s\"}}}", webAppUrl);
-
-        OkHttpClient client = new OkHttpClient();
-        RequestBody body = RequestBody.create(payload, MediaType.get("application/json; charset=utf-8"));
-        Request request = new Request.Builder().url(api).post(body).build();
-
-        try (Response response = client.newCall(request).execute()) {
-            if (response.body() != null) {
-                System.out.println("setChatMenuWebApp response: " + response.body().string());
-            } else {
-                System.out.println("setChatMenuWebApp: empty response");
-            }
-        } catch (IOException e) {
-            System.out.println("setChatMenuWebApp error: " + e.getMessage());
+            System.err.println("Failed to send menu: " + e.getMessage());
         }
     }
 

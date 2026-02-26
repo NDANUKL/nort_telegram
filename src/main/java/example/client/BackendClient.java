@@ -26,7 +26,7 @@ public class BackendClient {
     }
 
     public String getTrendingMarkets() {
-        return fetch(baseUrl + "/markets?limit=20&sort_by=volume");
+        return fetch(baseUrl + "/markets?limit=10&sort_by=volume");
     }
 
     public String getMarkets() {
@@ -34,7 +34,7 @@ public class BackendClient {
     }
 
     public String getSignals() {
-        return fetch(baseUrl + "/signals?top=20");
+        return fetch(baseUrl + "/signals?top=10");
     }
 
     public String getAIAdvice(String marketId) {
