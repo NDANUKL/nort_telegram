@@ -20,6 +20,9 @@ public class BackendClient {
                 .readTimeout(180, TimeUnit.SECONDS)
                 .build();
         this.baseUrl = "http://100.117.249.117:8000";  // Your server IP
+
+        // Point to Render backend
+        this.baseUrl = "https://nort.onrender.com";
     }
 
     public String getTrendingMarkets() {
@@ -48,6 +51,21 @@ public class BackendClient {
             return "❌ Connection to AI Agent failed.";
         }
     }
+
+    public String getPremiumAdvice(String marketId, long chatId) {
+    String json = String.format(
+        "{\"market_id\":\"%s\", \"telegram_id\":\"%d\", \"premium\":true}",
+        marketId, chatId
+    );
+    return post(baseUrl + "/agent/advice", json);
+    }
+
+    // ─────────────────────────────────────────────
+    // INTERN 5 — Paper Trading + Wallet
+    // POST /papertrade              → place a paper trade
+    // GET  /wallet/summary          → get wallet balance and trades
+    // POST /trade/commit            → attach testnet receipt
+    // ─────────────────────────────────────────────
 
     public String placePaperTrade(long chatId, String marketId, String side, double amount) {
         double pricePerShare = 0.5;
