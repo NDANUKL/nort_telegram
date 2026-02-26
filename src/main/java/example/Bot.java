@@ -1,26 +1,20 @@
 package example;
 
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
-import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
-import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
-import example.client.BackendClient;
+import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
-import org.telegram.telegrambots.meta.api.objects.webapp.WebAppInfo;
-import org.telegram.telegrambots.meta.api.objects.webapp.WebAppData;
+import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
+import example.client.BackendClient;
+import org.json.JSONObject;
+import org.json.JSONArray;
+
 import java.util.ArrayList;
 import java.util.List;
-import okhttp3.MediaType;
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.RequestBody;
-import okhttp3.Response;
-import java.io.IOException;
 
 public class Bot extends TelegramLongPollingBot {
 
-    // Access to the Python Backend via our Client
     private final BackendClient backend = new BackendClient();
 
     @Override
@@ -30,22 +24,16 @@ public class Bot extends TelegramLongPollingBot {
 
     @Override
     public String getBotToken() {
+        String token = System.getenv("BOT_TOKEN");
+        if (token == null || token.isEmpty()) {
+            throw new RuntimeException("BOT_TOKEN environment variable not set!");
+        }
+        return token;
         return System.getenv("BOT_TOKEN");
     }
 
     @Override
     public void onUpdateReceived(Update update) {
-
-        // --- HANDLER 0: WEB APP DATA ---
-        if (update.hasMessage() && update.getMessage().getWebAppData() != null) {
-            long chatId = update.getMessage().getChatId();
-            WebAppData wad = update.getMessage().getWebAppData();
-            String data = wad.getData();
-            sendText(chatId, "📨 Received data from Web App: " + data);
-            return;
-        }
-
-        // --- HANDLER 1: TEXT COMMANDS ---
         if (update.hasMessage() && update.getMessage().hasText()) {
             String messageText = update.getMessage().getText();
             long chatId = update.getMessage().getChatId();
@@ -78,9 +66,14 @@ public class Bot extends TelegramLongPollingBot {
                     break;
 
                 case "/trending":
+                    sendText(chatId, "Querying trending markets...");
                     sendText(chatId, "*Querying Signals Engine...*");
                     String marketData = backend.getTrendingMarkets();
-                    sendText(chatId, "**Top Opportunities:**\n" + marketData);
+                    if (marketData == null || marketData.trim().isEmpty()) {
+                        marketData = "No trending markets available at this time.";
+                    }
+                    sendText(chatId, "TRENDING MARKETS\n" +
+                            "═══════════════════════\n\n" + marketData);
                     break;
 
                 case "/advice":
@@ -121,9 +114,13 @@ public class Bot extends TelegramLongPollingBot {
                     break;
 
                 case "/markets":
-                    sendText(chatId, "*Fetching Markets...*");
+                    sendText(chatId, "Fetching market data...");
                     String rawMarkets = backend.getMarkets();
-                    sendText(chatId, "**Top Markets:**\n" + rawMarkets);
+                    if (rawMarkets == null || rawMarkets.trim().isEmpty()) {
+                        rawMarkets = "No market data available at this time.";
+                    }
+                    sendText(chatId, "LIVE MARKETS\n" +
+                            "═══════════════════════\n\n" + rawMarkets);
                     break;
 
                 case "/signals":
@@ -135,19 +132,36 @@ public class Bot extends TelegramLongPollingBot {
                 case "/papertrade":
                     String[] parts = messageText.split(" ");
                     if (parts.length < 4) {
-                        sendText(chatId, "📝 Use: `/papertrade <id> <yes/no> <amount>`");
+                        sendText(chatId, "PAPER TRADE ORDER\n" +
+                                "═══════════════════════\n" +
+                                "Usage: /papertrade <market_id> <yes/no> <amount>\n" +
+                                "Example: /papertrade 527079 yes 50\n\n" +
+                                "Simulates trades without real money risk.");
                     } else {
-                        String result = backend.placePaperTrade(chatId, parts[1], parts[2], Double.parseDouble(parts[3]));
-                        sendText(chatId, "🎯 **Trade Status:** " + result);
+                        try {
+                            String result = backend.placePaperTrade(chatId, parts[1], parts[2], Double.parseDouble(parts[3]));
+                            sendText(chatId, "PAPER TRADE EXECUTED\n" +
+                                    "═══════════════════════\n\n" + result);
+                        } catch (NumberFormatException e) {
+                            sendText(chatId, "Invalid amount. Please use numbers only (e.g. 50, 100.50).");
+                        }
                     }
                     break;
 
                 default:
-                    sendText(chatId, "❓ Unknown command. Tap /start to see options.");
+                    sendText(chatId, "NORT67 AI MARKET ANALYST\n\n" +
+                            "Available commands:\n" +
+                            "• /trending - Hottest markets by volume\n" +
+                            "• /advice <id> - AI analysis for market\n" +
+                            "• /signals - Algorithmic trading signals\n" +
+                            "• /markets - Live market listings\n" +
+                            "• /portfolio - Paper trading summary\n" +
+                            "• /papertrade <id> yes/no <amount> - Simulate trades\n\n" +
+                            "Type /start for interactive menu.");
             }
         }
 
-        // --- HANDLER 2: BUTTON CLICKS (CALLBACK QUERIES) ---
+        // Button callbacks
         else if (update.hasCallbackQuery()) {
             String callData = update.getCallbackQuery().getData();
             long chatId = update.getCallbackQuery().getMessage().getChatId();
@@ -165,23 +179,25 @@ public class Bot extends TelegramLongPollingBot {
         }
     }
 
-    // --- UI COMPONENT: MAIN MENU ---
-    public void sendMenu(Long chatId) {
+    public void sendMenu(long chatId) {
         SendMessage sm = SendMessage.builder()
-                .chatId(chatId.toString())
-                .text("**Nort67 AI Assistant**\nWelcome to the prediction market hub. Select a service:")
-                .parseMode("Markdown")
+                .chatId(String.valueOf(chatId))
+                .text("NORT67 AI MARKET ANALYST\n\n" +
+                        "Real-time prediction market analysis powered by:\n" +
+                        "• Live market data feeds\n" +
+                        "• AI reasoning engine\n" +
+                        "• Web intelligence gathering\n\n" +
+                        "Paper trading environment - risk-free strategy testing\n\n" +
+                        "Commands: /advice /signals /trending /portfolio")
                 .build();
 
         InlineKeyboardMarkup markupInline = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rowsInline = new ArrayList<>();
 
-        // Row 1: Market Analysis
         List<InlineKeyboardButton> row1 = new ArrayList<>();
-        row1.add(InlineKeyboardButton.builder().text("🔥 Trending").callbackData("btn_trending").build());
-        row1.add(InlineKeyboardButton.builder().text("🧠 AI Advice").callbackData("btn_advice").build());
+        row1.add(InlineKeyboardButton.builder().text("Trending Markets").callbackData("btn_trending").build());
+        row1.add(InlineKeyboardButton.builder().text("AI Advice").callbackData("btn_advice").build());
 
-        // Row 2: Management
         List<InlineKeyboardButton> row2 = new ArrayList<>();
         row2.add(InlineKeyboardButton.builder().text("📂 Portfolio").callbackData("btn_portfolio").build());
 
@@ -232,17 +248,15 @@ public class Bot extends TelegramLongPollingBot {
         }
     }
 
-    // --- HELPER: BASIC TEXT SENDER ---
-    public void sendText(Long chatId, String text) {
+    public void sendText(long chatId, String text) {
         SendMessage sm = SendMessage.builder()
-                .chatId(chatId.toString())
+                .chatId(String.valueOf(chatId))
                 .text(text)
-                .parseMode("Markdown")
                 .build();
         try {
             execute(sm);
         } catch (TelegramApiException e) {
-            e.printStackTrace();
+            System.err.println("Failed to send message: " + e.getMessage());
         }
     }
 }

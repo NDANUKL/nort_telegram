@@ -7,6 +7,7 @@
     <list default="true" id="c031a44b-e24b-419b-b106-5fe675c101a9" name="Changes" comment="Updated the base url">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/example/Bot.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/example/Bot.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/example/Main.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/example/Main.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/example/client/BackendClient.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/example/client/BackendClient.java" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -54,11 +55,12 @@
     &quot;RunOnceActivity.MCP Project settings loaded&quot;: &quot;true&quot;,
     &quot;RunOnceActivity.OpenProjectViewOnStart&quot;: &quot;true&quot;,
     &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
     &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
     &quot;RunOnceActivity.typescript.service.memoryLimit.init&quot;: &quot;true&quot;,
     &quot;WebServerToolWindowFactoryState&quot;: &quot;false&quot;,
     &quot;com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1&quot;: &quot;true&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;main&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;feat/advice&quot;,
     &quot;junie.onboarding.icon.badge.shown&quot;: &quot;true&quot;,
     &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,
     &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
@@ -115,7 +117,8 @@
       <workItem from="1771669538580" duration="8438000" />
       <workItem from="1771755803056" duration="5881000" />
       <workItem from="1771921287146" duration="7342000" />
-      <workItem from="1771936893457" duration="8698000" />
+      <workItem from="1771936893457" duration="22528000" />
+      <workItem from="1772042399599" duration="9806000" />
     </task>
     <task id="LOCAL-00001" summary="Configured intern 3">
       <option name="closed" value="true" />
