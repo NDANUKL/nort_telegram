@@ -63,12 +63,35 @@ public class Bot extends TelegramLongPollingBot {
                     sendMenu(chatId);
                     break;
 
+                // ── UPDATED: formats top 10 instead of dumping raw JSON ──
                 case "/trending":
-                    sendText(chatId, "Querying trending markets...");
-                    String marketData = backend.getTrendingMarkets();
-                    if (marketData == null || marketData.trim().isEmpty())
-                        marketData = "No trending markets available at this time.";
-                    sendText(chatId, "TRENDING MARKETS\n═══════════════════════\n\n" + marketData);
+                    sendText(chatId, "Fetching top 10 trending markets...");
+                    String trendingRaw = backend.getTrendingMarkets();
+                    try {
+                        JSONObject trendingJson = new JSONObject(trendingRaw);
+                        JSONArray markets = trendingJson.getJSONArray("markets");
+                        StringBuilder trending = new StringBuilder();
+                        trending.append("TOP 10 TRENDING MARKETS\n");
+                        trending.append("═══════════════════════════════════════\n\n");
+                        for (int i = 0; i < markets.length(); i++) {
+                            JSONObject m    = markets.getJSONObject(i);
+                            String mid      = m.optString("id", "?");
+                            String question = m.optString("question", "Unknown");
+                            double volume   = m.optDouble("volume", 0);
+                            double odds     = m.optDouble("current_odds", 0);
+                            String expires  = m.optString("expires_at", "?").split(" ")[0];
+                            String oddsStr  = odds > 0 ? String.format("%.0f%%", odds * 100) : "-";
+                            trending.append(String.format("%d. %s\n", i + 1, question));
+                            trending.append(String.format("   ID: %-10s  Volume: $%,.0f\n", mid, volume));
+                            trending.append(String.format("   Odds: %-8s  Expires: %s\n", oddsStr, expires));
+                            trending.append("\n");
+                        }
+                        trending.append("───────────────────────────────────────\n");
+                        trending.append("Use /advice <id> for a full AI analysis.");
+                        sendText(chatId, trending.toString());
+                    } catch (Exception e) {
+                        sendText(chatId, "Unable to retrieve trending markets at this time.");
+                    }
                     break;
 
                 case "/advice":
@@ -136,7 +159,7 @@ public class Bot extends TelegramLongPollingBot {
                                     String address = paymentJson.getString("address");
                                     String asset   = paymentJson.getString("asset");
                                     sendText(chatId, "💎 *Premium Content Locked*\n\nTo unlock, send $"
-                                        + amount + " " + asset + " to:\n`" + address + "`\non Base network.\n\nReply with your transaction hash.");
+                                            + amount + " " + asset + " to:\n`" + address + "`\non Base network.\n\nReply with your transaction hash.");
                                 } catch (Exception ex) {
                                     sendText(chatId, "Payment required, but could not parse payment details.\nRaw: " + premiumResponse);
                                 }
@@ -165,12 +188,44 @@ public class Bot extends TelegramLongPollingBot {
                     sendText(chatId, "LIVE MARKETS\n═══════════════════════\n\n" + rawMarkets);
                     break;
 
+                // ── UPDATED: formats top 10 instead of dumping raw JSON ──
                 case "/signals":
                     sendText(chatId, "Analyzing market momentum...");
-                    String signals = backend.getSignals();
-                    if (signals == null || signals.trim().isEmpty())
-                        signals = "No signals available.";
-                    sendText(chatId, "MARKET SIGNALS RANKING\n═══════════════════════\n\n" + signals);
+                    String signalsRaw = backend.getSignals();
+                    try {
+                        JSONArray signalList;
+                        String trimmed = signalsRaw.trim();
+                        if (trimmed.startsWith("[")) {
+                            signalList = new JSONArray(trimmed);
+                        } else {
+                            JSONObject wrapped = new JSONObject(trimmed);
+                            signalList = wrapped.getJSONArray(wrapped.keys().next());
+                        }
+                        StringBuilder signals = new StringBuilder();
+                        signals.append("TOP 10 MARKET SIGNALS\n");
+                        signals.append("═══════════════════════════════════════\n\n");
+                        for (int i = 0; i < signalList.length(); i++) {
+                            JSONObject s    = signalList.getJSONObject(i);
+                            String mid      = s.optString("market_id", "?");
+                            String question = s.optString("question", "Unknown");
+                            double score    = s.optDouble("score", 0);
+                            String reason   = s.optString("reason", "");
+                            double volume   = s.optDouble("volume", 0);
+                            double odds     = s.optDouble("current_odds", 0);
+                            String oddsStr  = odds > 0 ? String.format("%.0f%%", odds * 100) : "-";
+                            int scorePct    = (int) Math.round(score * 100);
+                            signals.append(String.format("%d. %s\n", i + 1, question));
+                            signals.append(String.format("   ID: %-10s  Score: %d%%\n", mid, scorePct));
+                            signals.append(String.format("   Volume: $%,.0f  |  Odds: %s\n", volume, oddsStr));
+                            signals.append(String.format("   Note: %s\n", reason));
+                            signals.append("\n");
+                        }
+                        signals.append("───────────────────────────────────────\n");
+                        signals.append("Use /advice <id> to get a full AI analysis.");
+                        sendText(chatId, signals.toString());
+                    } catch (Exception e) {
+                        sendText(chatId, "Signal parse error: " + e.getMessage() + "\nRaw preview: " + signalsRaw.substring(0, Math.min(200, signalsRaw.length())));
+                    }
                     break;
 
                 case "/papertrade":
@@ -210,17 +265,38 @@ public class Bot extends TelegramLongPollingBot {
 
             switch (callData) {
                 case "btn_trending":
-                    String response = backend.getTrendingMarkets();
-                    sendText(chatId, response != null && !response.trim().isEmpty() ?
-                            "TRENDING MARKETS\n═══════════════════════\n\n" + response :
-                            "No trending market data available at this time.");
+                    String trendingRaw2 = backend.getTrendingMarkets();
+                    try {
+                        JSONObject trendingJson2 = new JSONObject(trendingRaw2);
+                        JSONArray markets2 = trendingJson2.getJSONArray("markets");
+                        StringBuilder trending2 = new StringBuilder();
+                        trending2.append("TOP 10 TRENDING MARKETS\n");
+                        trending2.append("═══════════════════════════════════════\n\n");
+                        for (int i = 0; i < markets2.length(); i++) {
+                            JSONObject m    = markets2.getJSONObject(i);
+                            String mid      = m.optString("id", "?");
+                            String question = m.optString("question", "Unknown");
+                            double volume   = m.optDouble("volume", 0);
+                            double odds     = m.optDouble("current_odds", 0);
+                            String expires  = m.optString("expires_at", "?").split(" ")[0];
+                            String oddsStr  = odds > 0 ? String.format("%.0f%%", odds * 100) : "-";
+                            trending2.append(String.format("%d. %s\n", i + 1, question));
+                            trending2.append(String.format("   ID: %s  |  $%,.0f  |  %s  |  %s\n\n", mid, volume, oddsStr, expires));
+                        }
+                        trending2.append("Use /advice <id> for a full AI analysis.");
+                        sendText(chatId, trending2.toString());
+                    } catch (Exception e) {
+                        sendText(chatId, "Unable to retrieve trending markets at this time.");
+                    }
                     break;
+
                 case "btn_advice":
                     sendText(chatId, "AI ADVICE\n═════════════\n" +
                             "Usage: /advice <market_id>\n" +
                             "Example: /advice 527079\n\n" +
                             "Get detailed AI-powered analysis for any market.");
                     break;
+
                 case "btn_portfolio":
                     sendText(chatId, "PORTFOLIO SUMMARY (Paper Trading Mode)\n" +
                             "═══════════════════════════════════════\n" +
@@ -265,6 +341,10 @@ public class Bot extends TelegramLongPollingBot {
     }
 
     public void sendText(long chatId, String text) {
+        // Telegram enforces a 4096 character limit per message
+        if (text.length() > 4096) {
+            text = text.substring(0, 4090) + "\n[...]";
+        }
         SendMessage sm = SendMessage.builder()
                 .chatId(String.valueOf(chatId))
                 .text(text)
