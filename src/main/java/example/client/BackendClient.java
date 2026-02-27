@@ -27,7 +27,7 @@ public class BackendClient {
     // ─────────────────────────────────────────────
 
     public String getTrendingMarkets() {
-        return fetch(baseUrl + "/markets?limit=10&sort_by=volume");
+        return fetch(baseUrl + "/markets?limit=10&sort_by=volume&category=crypto"); // Top 10 crypto markets sorted by volume
     }
 
     public String getMarkets() {
