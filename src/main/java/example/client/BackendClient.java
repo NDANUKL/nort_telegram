@@ -59,12 +59,12 @@ public class BackendClient {
         return post(baseUrl + "/agent/advice", json);
     }
 
-    public String verifyPayment(String proof, long chatId) {
+    public String verifyPayment(String proof, long chatId, String marketId) {
         String json = String.format(
-                "{\"proof\":\"%s\", \"user_id\":\"%d\"}",
-                proof, chatId
+                "{\"proof\":\"%s\", \"telegram_id\":\"%d\", \"market_id\":\"%s\"}",
+                proof, chatId, marketId
         );
-        return post(baseUrl + "/agent/x402/verify", json);
+        return post(baseUrl + "/x402/verify", json);
     }
 
     public String placePaperTrade(long chatId, String marketId, String side, double amount) {

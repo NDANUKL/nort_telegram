@@ -232,7 +232,7 @@ public class Bot extends TelegramLongPollingBot {
         }
 
         sendText(chatId, "Verifying payment on Base for market " + marketId + "...");
-        String verifyResult = backend.verifyPayment(txHash, chatId);
+        String verifyResult = backend.verifyPayment(txHash, chatId, marketId);
 
         try {
             JSONObject verifyJson = new JSONObject(verifyResult);
