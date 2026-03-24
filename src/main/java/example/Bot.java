@@ -42,16 +42,19 @@ public class Bot extends TelegramLongPollingBot {
     @Override
     public void onUpdateReceived(Update update) {
         if (update.hasMessage() && update.getMessage().hasText()) {
-            handleIncomingMessage(update.getMessage().getChatId(), update.getMessage().getText().trim());
+            String username = update.getMessage().getFrom() != null ? update.getMessage().getFrom().getUserName() : null;
+            handleIncomingMessage(update.getMessage().getChatId(), update.getMessage().getText().trim(), username);
         } else if (update.hasCallbackQuery()) {
             handleCallback(update);
         }
     }
 
-    private void handleIncomingMessage(long chatId, String messageText) {
+    private void handleIncomingMessage(long chatId, String messageText, String username) {
         if (messageText.isEmpty()) {
             return;
         }
+
+        syncTelegramState(chatId, username);
 
         String[] commandParts = messageText.split("\\s+");
         String command = commandParts[0].toLowerCase();
@@ -122,6 +125,7 @@ public class Bot extends TelegramLongPollingBot {
         String newLang = commandParts[1].toLowerCase();
         if (newLang.equals("sw") || newLang.equals("en")) {
             userLanguages.put(chatId, newLang);
+            applyTelegramProfile(backend.setTelegramLanguage(chatId, newLang));
             sendText(chatId, "Language updated to: " + (newLang.equals("sw") ? "Kiswahili" : "English"));
         } else {
             sendText(chatId, "Unsupported language. Use '/lang en' or '/lang sw'.");
@@ -131,7 +135,7 @@ public class Bot extends TelegramLongPollingBot {
     private void handleAutoTradeToggle(long chatId, boolean enabled) {
         sendText(chatId, (enabled ? "Enabling" : "Disabling") + " auto-trade permissions...");
         String result = backend.updatePermissions(chatId, enabled, null);
-        autoTradeEnabled.put(chatId, enabled);
+        applyPermissions(result, chatId);
         sendText(chatId, formatJsonOrRaw("Permission update", result));
     }
 
@@ -150,7 +154,7 @@ public class Bot extends TelegramLongPollingBot {
 
             sendText(chatId, "Setting auto-trade limit to $" + String.format("%.2f", limit) + "...");
             String result = backend.updatePermissions(chatId, null, limit);
-            autoTradeLimits.put(chatId, limit);
+            applyPermissions(result, chatId);
             sendText(chatId, formatJsonOrRaw("Limit update", result));
         } catch (NumberFormatException e) {
             sendText(chatId, "Invalid amount. Please use numbers only.");
@@ -196,6 +200,7 @@ public class Bot extends TelegramLongPollingBot {
 
         String marketId = commandParts[1];
         pendingPremiumMarkets.put(chatId, marketId);
+        applyTelegramProfile(backend.setPendingPremiumMarket(chatId, marketId));
         sendText(chatId, "Analyzing market " + marketId + " (" + (lang.equals("sw") ? "Kiswahili" : "English") + ")...");
 
         String premiumResponse = backend.getPremiumAdvice(marketId, chatId, lang);
@@ -247,6 +252,7 @@ public class Bot extends TelegramLongPollingBot {
 
                 sendPremiumAdvice(chatId, marketId, unlocked);
                 pendingPremiumMarkets.remove(chatId);
+                applyTelegramProfile(backend.setPendingPremiumMarket(chatId, null));
             } else {
                 sendText(chatId, "Payment not verified. Details: " + verifyJson.optString("reason", "Unknown error"));
             }
@@ -333,10 +339,13 @@ public class Bot extends TelegramLongPollingBot {
     private void handleCallback(Update update) {
         String callData = update.getCallbackQuery().getData();
         long chatId = update.getCallbackQuery().getMessage().getChatId();
+        String username = update.getCallbackQuery().getFrom() != null ? update.getCallbackQuery().getFrom().getUserName() : null;
+        syncTelegramState(chatId, username);
 
         if (callData.startsWith("lang_")) {
             String newLang = callData.substring(5);
             userLanguages.put(chatId, newLang);
+            applyTelegramProfile(backend.setTelegramLanguage(chatId, newLang));
             sendText(chatId, "Language updated to: " + (newLang.equals("sw") ? "Kiswahili" : "English"));
             return;
         }
@@ -509,6 +518,48 @@ public class Bot extends TelegramLongPollingBot {
             return "";
         }
         return text.substring(0, Math.min(300, text.length()));
+    }
+
+    private void syncTelegramState(long chatId, String username) {
+        String language = userLanguages.get(chatId);
+        applyTelegramProfile(backend.upsertTelegramUser(chatId, username, language));
+        applyPermissions(backend.getTelegramPermissions(chatId), chatId);
+    }
+
+    private void applyTelegramProfile(String payload) {
+        try {
+            JSONObject json = new JSONObject(payload);
+            if (json.has("language")) {
+                userLanguages.put(Long.parseLong(json.getString("telegram_id")), json.optString("language", "en"));
+            }
+            String pendingMarketId = json.optString("pending_premium_market_id", "");
+            long telegramId = Long.parseLong(json.getString("telegram_id"));
+            if (pendingMarketId == null || pendingMarketId.isBlank()) {
+                pendingPremiumMarkets.remove(telegramId);
+            } else {
+                pendingPremiumMarkets.put(telegramId, pendingMarketId);
+            }
+            if (json.has("auto_trade_enabled")) {
+                autoTradeEnabled.put(telegramId, json.optBoolean("auto_trade_enabled", false));
+            }
+            if (!json.isNull("auto_trade_limit")) {
+                autoTradeLimits.put(telegramId, json.optDouble("auto_trade_limit", DEFAULT_AUTO_TRADE_AMOUNT));
+            }
+        } catch (Exception ignored) {
+        }
+    }
+
+    private void applyPermissions(String payload, long chatId) {
+        try {
+            JSONObject json = new JSONObject(payload);
+            if (json.has("auto_trade")) {
+                autoTradeEnabled.put(chatId, json.optBoolean("auto_trade", false));
+            }
+            if (!json.isNull("limit")) {
+                autoTradeLimits.put(chatId, json.optDouble("limit", DEFAULT_AUTO_TRADE_AMOUNT));
+            }
+        } catch (Exception ignored) {
+        }
     }
 
     public void sendMenu(long chatId) {

@@ -82,6 +82,43 @@ public class BackendClient {
         return fetch(baseUrl + "/wallet/summary?telegram_user_id=" + chatId);
     }
 
+    public String upsertTelegramUser(long chatId, String username, String language) {
+        String usernameJson = (username != null && !username.isBlank())
+                ? String.format(", \"username\":\"%s\"", escapeJson(username))
+                : "";
+        String languageJson = (language != null && !language.isBlank())
+                ? String.format(", \"language\":\"%s\"", escapeJson(language))
+                : "";
+        String json = String.format(
+                "{\"telegram_id\":\"%d\"%s%s}",
+                chatId, usernameJson, languageJson
+        );
+        return post(baseUrl + "/telegram/user/upsert", json);
+    }
+
+    public String setTelegramLanguage(long chatId, String language) {
+        String json = String.format(
+                "{\"telegram_id\":\"%d\", \"language\":\"%s\"}",
+                chatId, escapeJson(language)
+        );
+        return post(baseUrl + "/telegram/preferences/language", json);
+    }
+
+    public String setPendingPremiumMarket(long chatId, String marketId) {
+        String marketJson = (marketId == null || marketId.isBlank())
+                ? "null"
+                : String.format("\"%s\"", escapeJson(marketId));
+        String json = String.format(
+                "{\"telegram_id\":\"%d\", \"market_id\":%s}",
+                chatId, marketJson
+        );
+        return post(baseUrl + "/telegram/session/premium-request", json);
+    }
+
+    public String getTelegramPermissions(long chatId) {
+        return fetch(baseUrl + "/telegram/permissions/" + chatId);
+    }
+
     // NEW: Permissions route POST /permissions
     public String updatePermissions(long chatId, Boolean autoTrade, Double limit) {
         String autoTradeStr = (autoTrade != null) ? String.valueOf(autoTrade) : "null";
@@ -121,5 +158,9 @@ public class BackendClient {
         }
 
         return payload;
+    }
+
+    private String escapeJson(String value) {
+        return value.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 }
